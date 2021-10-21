@@ -7,6 +7,7 @@ import javax.swing.border.EmptyBorder;
 import java.awt.GridLayout;
 import javax.swing.UIManager;
 import javax.swing.JTextArea;
+import java.util.ArrayList;
 import javax.swing.JTextField;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -32,7 +33,11 @@ public class GUI extends JFrame {
   private JButton categoryButton;
   private JButton nameButton;
   private JTextArea log;
+  private JMenuItem sendDirItem;
   private JMenu downloadMenu;
+
+  private int port;
+  private String serverIP;
 
   private String userName = null;
   private String category = null;
@@ -53,18 +58,30 @@ public class GUI extends JFrame {
     JPanel framePanel = new JPanel(new BorderLayout());
 
     JMenuBar menuBar = new JMenuBar();
-    downloadMenu = new JMenu("Download");
+    downloadMenu = new JMenu("Multi-file operations");
+
+
 
     JMenuItem i1 = new JMenuItem("Download Photo Archive");
     i1.addActionListener(new ActionListener() {
       public void actionPerformed(ActionEvent e) {
         log.append("Beginning download of archive: this may take a minute.\n");
-
         client.getAllFilesAsZip();
+        log.append("Done.\n");
       }
     });
+    sendDirItem = new JMenuItem("Send all photos in directory");
+    sendDirItem.addActionListener(new ActionListener() {
+      public void actionPerformed(ActionEvent e) {
+        System.out.println("HI");
+        log.append("Choose a directory.\n");
+        sendAllFilesInDir();
+      }
+    });
+    downloadMenu.add(sendDirItem);
     downloadMenu.add(i1);
     downloadMenu.setEnabled(false);
+    sendDirItem.setEnabled(false);
     menuBar.add(downloadMenu);
     this.setJMenuBar(menuBar);
 
@@ -85,7 +102,9 @@ public class GUI extends JFrame {
     connectButton.setFocusPainted(false);
     connectButton.addActionListener(new ActionListener() {
       public void actionPerformed(ActionEvent e) {
-        connect();
+        if (aquireServerInfo()) {
+          connect();
+        }
       }
     });
     buttonPanel.add(connectButton);
@@ -101,8 +120,11 @@ public class GUI extends JFrame {
         if (temp != null) {
           userName = temp;
           log.append("Set name to: " + userName + "\n");
-          if (category != null && userName != null) {
-            sendButton.setEnabled(true);
+          if (userName != null) {
+            sendDirItem.setEnabled(true);
+            if (category != null) {
+              sendButton.setEnabled(true);
+            }
           }
         }
       }
@@ -168,6 +190,36 @@ public class GUI extends JFrame {
 
   }
 
+  private boolean aquireServerInfo() {
+    JTextField IPField = new JTextField(20);
+    JTextField portField = new JTextField(6);
+
+    JPanel ipPanel = new JPanel();
+    ipPanel.add(new JLabel("Server IP Address:"));
+    ipPanel.add(IPField);
+    JPanel portPanel = new JPanel();
+    portPanel.add(new JLabel("Server Port:"));
+    portPanel.add(portField);
+
+    int result = JOptionPane.showConfirmDialog(null, ipPanel,
+             "Please Enter Server Information", JOptionPane.OK_CANCEL_OPTION);
+    if (result == JOptionPane.OK_OPTION) {
+       serverIP = IPField.getText();
+       result = JOptionPane.showConfirmDialog(null, portPanel,
+                "Please Enter Server Information", JOptionPane.OK_CANCEL_OPTION);
+       if (result == JOptionPane.OK_OPTION) {
+         try {
+           port = Integer.parseInt(portField.getText());
+         } catch (Exception e) {
+           log.append("Port must be a number.\n");
+           return false;
+         }
+         return true;
+       }
+    }
+    return false;
+  }
+
   private void displayHelperMessage() {
     log.append("Thank's for using Quinn's File Uploader!\n");
     log.append("To send files to be archived you must first:\n");
@@ -186,8 +238,11 @@ public class GUI extends JFrame {
     int result = JOptionPane.showConfirmDialog(null, myPanel,
             "Connect to Server", JOptionPane.OK_CANCEL_OPTION);
     if (result == JOptionPane.OK_OPTION) {
-       client = new Client();
+       client = new Client(serverIP, port);
        client.assignLogger(log);
+       if (!client.isActive()) {
+         return;
+       }
        if (client.login(password.getText())) {
          sendButton.setEnabled(false);
          closeButton.setEnabled(true);
@@ -229,6 +284,40 @@ public class GUI extends JFrame {
       log.append("Sent Successfully");
     }
 
+  }
+
+  public void sendAllFilesInDir() {
+    JFileChooser chooser = new JFileChooser();
+    chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+    chooser.setMultiSelectionEnabled(false);
+    int returnVal = chooser.showOpenDialog(new JFrame());
+    if(returnVal == JFileChooser.APPROVE_OPTION) {
+
+      File dir = chooser.getSelectedFile();
+      log.append("Beginning to send:\n");
+      ArrayList<String> paths = PhotoData.getFilePaths(dir, dir.getAbsoluteFile().getPath());
+      int i = 0;
+      int total = paths.size() - 1;
+      for (String path : paths) {
+        log.append("Sending file #" + i + " of " + total + "\n");
+        try {
+          File f = new File(path);
+          client.sendFile(userName,
+                          "unsorted",
+                          getFileExtension(f),
+                          f.getAbsoluteFile().getPath());
+        } catch (IOException e) {
+          log.append("Failed to send file\n");
+          e.printStackTrace();
+          client.closeConnection();
+          sendButton.setEnabled(false);
+          closeButton.setEnabled(false);
+          break;
+        }
+        i++;
+      }
+      log.append("Sent Successfully\n");
+    }
   }
 
   private String getTextFromUser(String question, String title) {

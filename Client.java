@@ -12,58 +12,36 @@ public class Client {
 
 
   private Socket server = null;
-  private int port;
-  private String serverIP = null;
   private InputStream inputStream;
   private OutputStream outputStream;
   private DataInputStream in;
   private DataOutputStream out;
+  private boolean active;
 
   private JTextArea log = null;
 
-  public Client() {
+  public Client(String serverIP, int port) {
 
     try {
-      aquireServerInfo();
+      active = false;
       Socket server = new Socket(serverIP, port);
 
       inputStream = server.getInputStream();
       outputStream = server.getOutputStream();
       in = new DataInputStream(inputStream);
       out = new DataOutputStream(outputStream);
-
+      active = true;
     } catch (Exception e) {
       log("Failed to connect to server\n");
-      e.printStackTrace();
+      active = false;
       JOptionPane.showConfirmDialog(null, "No server found at the location provided.",
                    "", JOptionPane.CLOSED_OPTION, JOptionPane.PLAIN_MESSAGE);
-      System.exit(-1);
     }
 
   }
 
-  private void aquireServerInfo() {
-    JTextField IPField = new JTextField(20);
-    JTextField portField = new JTextField(6);
-
-    JPanel ipPanel = new JPanel();
-    ipPanel.add(new JLabel("Server IP Address:"));
-    ipPanel.add(IPField);
-    JPanel portPanel = new JPanel();
-    portPanel.add(new JLabel("Server Port:"));
-    portPanel.add(portField);
-
-    int result = JOptionPane.showConfirmDialog(null, ipPanel,
-             "Please Enter Server Information", JOptionPane.OK_CANCEL_OPTION);
-    if (result == JOptionPane.OK_OPTION) {
-       serverIP = IPField.getText();
-       result = JOptionPane.showConfirmDialog(null, portPanel,
-                "Please Enter Server Information", JOptionPane.OK_CANCEL_OPTION);
-       if (result == JOptionPane.OK_OPTION) {
-         port = Integer.parseInt(portField.getText());
-       }
-    }
-
+  public boolean isActive() {
+    return active;
   }
 
   public void assignLogger(JTextArea area) {
@@ -85,24 +63,26 @@ public class Client {
 
   public void sendFile(String userID, String category, String extension, String path) throws IOException {
     out.writeInt(1); // Tells the server a file is coming
-    sendString(userID);
-    sendString(category);
-    sendString(extension);
+    sendString(PhotoData.getHash(path));
+    if (in.readInt() == 1) {
+      sendString(userID);
+      sendString(category);
+      sendString(extension);
 
-    File f = new File(path);
-    FileInputStream fis = new FileInputStream(f);
+      File f = new File(path);
+      FileInputStream fis = new FileInputStream(f);
 
-    long fileSize = f.length();
-    out.writeLong(fileSize);
-    System.out.println(fileSize);
+      long fileSize = f.length();
+      out.writeLong(fileSize);
+      System.out.println(fileSize);
 
-    byte[] data = new byte[4096];
-    int count = fis.read(data, 0, data.length);
-    while (count != -1) {
-      out.write(data, 0, count);
-      count = fis.read(data, 0, data.length);
-    }
-
+      byte[] data = new byte[4096];
+      int count = fis.read(data, 0, data.length);
+      while (count != -1) {
+        out.write(data, 0, count);
+        count = fis.read(data, 0, data.length);
+      }
+    } 
   }
 
   public boolean login(String password) {
@@ -127,6 +107,7 @@ public class Client {
     try {
       out.writeInt(2); // Asks for all files as zip;
       recieveFile("archive.zip");
+
     } catch (IOException e) {
 
     }

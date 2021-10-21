@@ -7,8 +7,10 @@ import java.util.zip.ZipOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.ArrayList;
 import javax.net.ssl.SSLSocket;
+import java.security.MessageDigest;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
+import java.io.FileNotFoundException;
 
 public class Server {
 
@@ -17,6 +19,7 @@ public class Server {
 
   private int numPhotos;
 
+  private PhotoData pd;
 
   private InputStream inputStream;
   private OutputStream outputStream;
@@ -120,6 +123,14 @@ public class Server {
   private void recieveFile() {
 
     try {
+      String hash = recieveString();
+      if (pd.hasFile(hash)) {
+        out.writeInt(0);
+        return;
+      } else {
+        out.writeInt(1);
+      }
+
       String user = recieveString();
       log("Recieving file from: " + user);
       new File("photos/"+user).mkdir();
@@ -132,7 +143,8 @@ public class Server {
       String fileExtension = recieveString();
       new File("photos/"+user+"/"+category).mkdir();
 
-      File fileObject = new File("photos/" + user + "/" + category + "/" + filename + fileExtension);
+      String newFilePath = "photos/" + user + "/" + category + "/" + filename + fileExtension;
+      File fileObject = new File(newFilePath);
       FileOutputStream newFile = new FileOutputStream(fileObject);
 
       long fileSize = in.readLong();
@@ -152,8 +164,8 @@ public class Server {
           bytesRead += c;
         }
       }
-
       newFile.close();
+
     } catch (IOException e) {
       e.printStackTrace();
     }
@@ -165,7 +177,7 @@ public class Server {
       File f = new File("photos.zip");
       ZipOutputStream outZip = new ZipOutputStream(new FileOutputStream(f));
 
-      ArrayList<String> paths = getFilePaths(new File("photos"), "photos");
+      ArrayList<String> paths = pd.getFilePaths(new File("photos"), "photos");
       for (String path : paths) {
         ZipEntry e = new ZipEntry(path);
         outZip.putNextEntry(e);
@@ -204,25 +216,6 @@ public class Server {
 
   }
 
-// For adding all files to a zip
-  private ArrayList<String> getFilePaths(File startDirectory, String prefix) {
-    ArrayList<String> paths = new ArrayList<String>();
-    File[] filesInDir = startDirectory.listFiles();
-
-    for (File f : filesInDir) {
-      if (f.isDirectory()) {
-        ArrayList<String> deeperPaths = getFilePaths(f, prefix + "/" + f.getName());
-        for (String s : deeperPaths) {
-          paths.add(s);
-        }
-      } else {
-        paths.add(prefix + "/" + f.getName());
-      }
-    }
-
-    return paths;
-  }
-
   private String recieveString() throws IOException {
     byte[] bytes = new byte[in.readInt()];
     in.read(bytes, 0, bytes.length);
@@ -233,9 +226,8 @@ public class Server {
     try {
       Scanner s = new Scanner(new File("PhotoData.data"));
       return s.nextInt();
-    } catch (Exception e) {
-      log("Could not get photo num from log\n");
-      System.exit(-1);
+    } catch (FileNotFoundException e) {
+      File newLog = new File("PhotoData.data");
     }
     return 0;
   }
@@ -253,6 +245,7 @@ public class Server {
 
   private void loadServerProperties() {
     File prop = new File("server.properties");
+    pd = new PhotoData();
     if (prop.exists() && !prop.isDirectory()) {
       try {
         Scanner s = new Scanner(prop);
@@ -272,6 +265,7 @@ public class Server {
         fw.write("password:TempPassword");
         fw.close();
         System.out.println("No properties file was found: one has been created.");
+        System.out.println("It has been filled with temporary values.");
       } catch (IOException e) {
         System.out.println("No properties file was found, and one couldn't be created. Exiting.");
         System.exit(-1);
