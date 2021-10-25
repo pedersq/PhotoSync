@@ -2,19 +2,58 @@ import java.util.HashSet;
 import java.security.MessageDigest;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.lang.StringBuilder;
 
 public class PhotoData {
 
   private HashSet<String> photos;
+  private int numPhotos;
 
   public PhotoData() {
-    photos = new HashSet<String>();
 
-    for (String s : getFilePaths(new File("photos"), "photos")) {
-      this.addFile(s);
+    File hashesFile = new File("data/hashes.ser");
+    if (hashesFile.exists()) {
+      try {
+        FileInputStream fileIn = new FileInputStream(hashesFile);
+        ObjectInputStream objIn = new ObjectInputStream(fileIn);
+        photos = (HashSet<String>) objIn.readObject();
+      } catch (Exception e) {
+        e.printStackTrace();
+        System.exit(-1);
+      }
+    } else {
+      System.out.println("Loading existing photos (may take a while)");
+      photos = new HashSet<String>();
+      for (String s : getFilePaths(new File("photos"), "photos")) {
+        this.addFile(s);
+      }
     }
+
+    numPhotos = photos.size();
+    System.out.println("Loaded " + numPhotos + " photos.");
+  }
+
+  public void serialize() {
+    System.out.print("Saving hashes data: ");
+    try {
+      FileOutputStream fileOut = new FileOutputStream("data/hashes.ser");
+      ObjectOutputStream out = new ObjectOutputStream(fileOut);
+      out.writeObject(photos);
+      out.close();
+      fileOut.close();
+      System.out.println("Done.");
+    } catch (Exception e) {
+      e.printStackTrace();
+      System.out.println("Couldn't save hashes file!");
+    }
+  }
+
+  public int getNumPhotos() {
+    return numPhotos;
   }
 
   public boolean hasFile(String hash) {

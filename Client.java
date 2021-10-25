@@ -82,7 +82,7 @@ public class Client {
         out.write(data, 0, count);
         count = fis.read(data, 0, data.length);
       }
-    } 
+    }
   }
 
   public boolean login(String password) {

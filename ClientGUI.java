@@ -22,9 +22,7 @@ import java.io.File;
 import java.io.*;
 import javax.swing.*;
 
-
-
-public class GUI extends JFrame {
+public class ClientGUI extends JFrame {
 
   private Client client;
   private JButton connectButton;
@@ -48,19 +46,17 @@ public class GUI extends JFrame {
       UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
     } catch (Exception ignored) {}
 
-    new GUI();
+    new ClientGUI();
 
   }
 
-  public GUI() {
-    this.setSize(new Dimension(610, 400));
+  public ClientGUI() {
+    this.setSize(new Dimension(630, 400));
     this.setTitle("Quinn's File Uploader");
     JPanel framePanel = new JPanel(new BorderLayout());
 
     JMenuBar menuBar = new JMenuBar();
     downloadMenu = new JMenu("Multi-file operations");
-
-
 
     JMenuItem i1 = new JMenuItem("Download Photo Archive");
     i1.addActionListener(new ActionListener() {
@@ -281,7 +277,7 @@ public class GUI extends JFrame {
           break;
         }
       }
-      log.append("Sent Successfully");
+      log.append("Sent Successfully\n");
     }
 
   }

@@ -5,6 +5,7 @@ import java.util.Date;
 import java.util.Scanner;
 import java.util.zip.ZipOutputStream;
 import java.util.zip.ZipEntry;
+import javax.swing.JTextArea;
 import java.util.ArrayList;
 import javax.net.ssl.SSLSocket;
 import java.security.MessageDigest;
@@ -19,25 +20,24 @@ public class Server {
 
   private int numPhotos;
 
-  private PhotoData pd;
+  public PhotoData pd;
+
+  private JTextArea log = null;
 
   private InputStream inputStream;
   private OutputStream outputStream;
   private DataInputStream in;
   private DataOutputStream out;
 
-  public static void main(String[] args) throws IOException {
+  public Server(int port, String password, JTextArea log, PhotoData pd) throws IOException {
+    this.port = port;
+    this.password = password;
+    this.log = log;
+    this.pd = pd;
 
-    new Server();
-
-  }
-
-  public Server() throws IOException {
     // Sets up the server
     ServerSocket serverSocket = null;
     Socket client = null;
-    loadServerProperties();
-    numPhotos = getPhotoNumFromLog();
     try {
       serverSocket = new ServerSocket(port);
       log("Sucessfully setup server on port: " + port);
@@ -71,6 +71,7 @@ public class Server {
                 break;
               case 2:
                 sendAllFilesAsZip();
+                break;
               default:
                 shouldClose = true;
                 log("Closing connection");
@@ -79,7 +80,7 @@ public class Server {
           }
 
         }
-
+        pd.serialize();
         client.close();
 
       } catch (IOException e) {
@@ -91,10 +92,13 @@ public class Server {
 
   private void log(String s) {
     try {
-      String filename= "Log.txt";
+      String filename= "data/Log.txt";
       FileWriter fw = new FileWriter(filename, true); //the true will append the new data
       fw.write(s + "\n");//appends the string to the file
       fw.close();
+      if (this.log != null) {
+        log.append(s + "\n");
+      }
     } catch(IOException ioe) {
       System.err.println("IOException: " + ioe.getMessage());
     }
@@ -126,6 +130,7 @@ public class Server {
       String hash = recieveString();
       if (pd.hasFile(hash)) {
         out.writeInt(0);
+        log("Attempted Duplicate Upload.");
         return;
       } else {
         out.writeInt(1);
@@ -135,9 +140,7 @@ public class Server {
       log("Recieving file from: " + user);
       new File("photos/"+user).mkdir();
 
-      numPhotos = numPhotos + 1;
-      String filename = String.valueOf(numPhotos);
-      updatePhotoNumLog();
+      String filename = String.valueOf(pd.getNumPhotos() + 1);
       String category = recieveString();
 
       String fileExtension = recieveString();
@@ -165,6 +168,8 @@ public class Server {
         }
       }
       newFile.close();
+      pd.addFile(newFilePath);
+
 
     } catch (IOException e) {
       e.printStackTrace();
@@ -220,57 +225,6 @@ public class Server {
     byte[] bytes = new byte[in.readInt()];
     in.read(bytes, 0, bytes.length);
     return new String(bytes, "UTF-8");
-  }
-
-  private int getPhotoNumFromLog() {
-    try {
-      Scanner s = new Scanner(new File("PhotoData.data"));
-      return s.nextInt();
-    } catch (FileNotFoundException e) {
-      File newLog = new File("PhotoData.data");
-    }
-    return 0;
-  }
-
-  private void updatePhotoNumLog() {
-    try {
-      FileWriter fw = new FileWriter("PhotoData.data");
-      fw.write(String.valueOf(numPhotos));
-      fw.close();
-    } catch (Exception e) {
-      log("Could not update num photo log\n");
-      System.exit(-1);
-    }
-  }
-
-  private void loadServerProperties() {
-    File prop = new File("server.properties");
-    pd = new PhotoData();
-    if (prop.exists() && !prop.isDirectory()) {
-      try {
-        Scanner s = new Scanner(prop);
-        String portText = s.nextLine();
-        String passwordText = s.nextLine();
-        port = Integer.parseInt(portText.split(":")[1]);
-        password = passwordText.split(":")[1];
-        s.close();
-      } catch (Exception e) {
-        System.out.println("Couldn't read from server.properties, exiting.");
-        System.exit(-1);
-      }
-    } else {
-      try {
-        FileWriter fw = new FileWriter(prop);
-        fw.write("port:4445\n", 0, 10);
-        fw.write("password:TempPassword");
-        fw.close();
-        System.out.println("No properties file was found: one has been created.");
-        System.out.println("It has been filled with temporary values.");
-      } catch (IOException e) {
-        System.out.println("No properties file was found, and one couldn't be created. Exiting.");
-        System.exit(-1);
-      }
-    }
   }
 
 
